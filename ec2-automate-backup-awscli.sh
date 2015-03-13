@@ -1,9 +1,10 @@
-#!/bin/bash -
-# Date: 2014-04-12
-# Version 0.10
+#!/usr/bin/env bash
+# Date: 2015-03-13
+Version=0.2
 # License Type: GNU GENERAL PUBLIC LICENSE, Version 3
-# Author:
+# Authors:
 # Colin Johnson / https://github.com/colinbjohnson / colin@cloudavail.com
+# Ryan Melcer / https://github.com/rmelcer
 # Contributors:
 # Alex Corley / https://github.com/anthroprose
 # Jon Higgs / https://github.com/jonhiggs
@@ -147,19 +148,46 @@ user_tags=false
 purge_snapshots=false
 #handles options processing
 
-while getopts :s:c:r:v:t:k:pnhu opt; do
+USAGE() {
+    echo
+    echo "Usage:  $app_name [flags] [options] [-s volumeid] -V <volumeid> [...]"
+    echo "        $app_name [flags] [options] -s tag -t <tag>"
+    echo "        $app_name [-h | -?]"
+    echo
+    echo "Arguments:"
+    echo "    -s <string>         Selection method (default: 'volumeid')"
+    echo "    -V <volume ids>     List of volume IDs "
+    echo "    -t <string>         Tag id to look for (ex: 'Backup,Values=true')"
+    echo "Options with arguments:"
+    echo "    -c <file>           File to prime cron environment"
+    echo "    -r <string>         EC2 region (default: 'us-east-1')"
+    echo "    -k <time period>    Mark backups as purgeable after time period (d,h,m,s)"
+    echo "Flags:"
+    echo "    -n                  Name backup"
+    echo "    -H                  Tag snapshot with backup machine's hostname"
+    echo "    -u                  Tag snapshot with volume id and creation date"
+    echo "    -p                  Purge old snapshots"
+    echo "    -v                  Print version and exit"
+}
+
+
+while getopts :s:c:r:t:k:vpnHuhV opt; do
   case $opt in
     s) selection_method="$OPTARG" ;;
     c) cron_primer="$OPTARG" ;;
     r) region="$OPTARG" ;;
-    v) volumeid="$OPTARG" ;;
+    #v) volumeid="$OPTARG" ;;
+    v) echo "version $Version"; exit 0 ;;
     t) tag="$OPTARG" ;;
     k) purge_after_input="$OPTARG" ;;
     n) name_tag_create=true ;;
-    h) hostname_tag_create=true ;;
+    H) hostname_tag_create=true ;;
     p) purge_snapshots=true ;;
     u) user_tags=true ;;
-    *) echo "Error with Options Input. Cause of failure is most likely that an unsupported parameter was passed or a parameter was passed without a corresponding option." 1>&2 ; exit 64 ;;
+    h) USAGE && exit 0 ;;
+    V) volumeid="$OPTARG" ;;
+    \?) echo "Invalid option: -$OPTARG"; exit 1 ;;
+    *) USAGE; exit 0 ;;
   esac
 done
 

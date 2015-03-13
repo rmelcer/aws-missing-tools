@@ -7,7 +7,7 @@ export JAVA_HOME=/usr/lib/jvm/jre
 # export PATH=/opt/aws/bin/ is required for EC2 API Tools
 # export PATH=/usr/bin is required for AWS Command Line Interface tools
 # typical system path PATH=/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/opt/aws/bin:/home/ec2-user/bin
-export PATH=/bin:/usr/bin:/opt/aws/bin/
+export PATH=/usr/local/bin:/bin:/usr/bin:/opt/aws/bin/
 
 # AWS_ACCESS_KEY and AWS_SECRET_KEY needed for EC2 CLI tools
 export AWS_ACCESS_KEY=<your_access_key>
