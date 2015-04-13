@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Date: 2015-03-13
-Version=0.2
+VERSION=0.2.1
 # License Type: GNU GENERAL PUBLIC LICENSE, Version 3
 # Authors:
 # Colin Johnson / https://github.com/colinbjohnson / colin@cloudavail.com
@@ -30,24 +30,24 @@ get_EBS_List() {
   case $selection_method in
     volumeid)
       if [[ -z $volumeid ]]; then
-        echo "The selection method \"volumeid\" (which is $app_name's default selection_method of operation or requested by using the -s volumeid parameter) requires a volumeid (-v volumeid) for operation. Correct usage is as follows: \"-v vol-6d6a0527\",\"-s volumeid -v vol-6d6a0527\" or \"-v \"vol-6d6a0527 vol-636a0112\"\" if multiple volumes are to be selected." 1>&2 ; exit 64
+        echo "Volume ID is required by default." 1>&2 ; exit 64
       fi
       ebs_selection_string="--volume-ids $volumeid"
       ;;
     tag)
       if [[ -z $tag ]]; then
-        echo "The selected selection_method \"tag\" (-s tag) requires a valid tag (-t Backup,Values=true) for operation. Correct usage is as follows: \"-s tag -t Backup,Values=true.\"" 1>&2 ; exit 64
+        echo "Valid tag (-t Backup,Values=true) required." 1>&2 ; exit 64
       fi
       ebs_selection_string="--filters Name=tag:$tag"
       ;;
-    *) echo "If you specify a selection_method (-s selection_method) for selecting EBS volumes you must select either \"volumeid\" (-s volumeid) or \"tag\" (-s tag)." 1>&2 ; exit 64 ;;
+    *) echo "Invalid selection method." 1>&2 ; exit 64 ;;
   esac
   #creates a list of all ebs volumes that match the selection string from above
   ebs_backup_list=$(aws ec2 describe-volumes --region $region $ebs_selection_string --output text --query 'Volumes[*].VolumeId')
   #takes the output of the previous command 
   ebs_backup_list_result=$(echo $?)
   if [[ $ebs_backup_list_result -gt 0 ]]; then
-    echo -e "An error occurred when running ec2-describe-volumes. The error returned is below:\n$ebs_backup_list_complete" 1>&2 ; exit 70
+    echo -e "An error occurred when running ec2-describe-volumes:\n$ebs_backup_list_complete" 1>&2 ; exit 70
   fi
 }
 
@@ -126,8 +126,8 @@ purge_EBS_Snapshots() {
       # PurgeAfterFE is earlier than the current date
       # and the snapshot can be safely purged
       if [[ $purge_after_fe < $current_date ]]; then
-        echo "Snapshot \"$snapshot_id_evaluated\" with the PurgeAfterFE date of \"$purge_after_fe\" will be deleted."
         aws_ec2_delete_snapshot_result=$(aws ec2 delete-snapshot --region $region --snapshot-id $snapshot_id_evaluated --output text 2>&1)
+        echo "Snapshot \"$snapshot_id_evaluated\" with deletion date of \"$purge_after_fe\" was deleted."
       fi
     fi
   done
@@ -168,6 +168,7 @@ USAGE() {
     echo "    -u                  Tag snapshot with volume id and creation date"
     echo "    -p                  Purge old snapshots"
     echo "    -v                  Print version and exit"
+    echo
 }
 
 
@@ -177,7 +178,7 @@ while getopts :s:c:r:t:k:vpnHuhV opt; do
     c) cron_primer="$OPTARG" ;;
     r) region="$OPTARG" ;;
     #v) volumeid="$OPTARG" ;;
-    v) echo "version $Version"; exit 0 ;;
+    v) echo "version $VERSION"; exit 0 ;;
     t) tag="$OPTARG" ;;
     k) purge_after_input="$OPTARG" ;;
     n) name_tag_create=true ;;
@@ -223,7 +224,7 @@ if [[ -n $purge_after_input ]]; then
     get_date_binary
   fi
   purge_after_date_fe=$(get_purge_after_date_fe)
-  echo "Snapshots taken by $app_name will be eligible for purging after the following date (the purge after date given in seconds from epoch): $purge_after_date_fe."
+  echo "Snapshots will be eligible for purging after $(date -r $purge_after_date_fe)."
 fi
 
 #get_EBS_List gets a list of EBS instances for which a snapshot is desired. The list of EBS instances depends upon the selection_method that is provided by user input
@@ -234,13 +235,14 @@ for ebs_selected in $ebs_backup_list; do
   ec2_snapshot_description="ec2ab_${ebs_selected}_$current_date"
   ec2_snapshot_resource_id=$(aws ec2 create-snapshot --region $region --description $ec2_snapshot_description --volume-id $ebs_selected --output text --query SnapshotId 2>&1)
   if [[ $? != 0 ]]; then
-    echo -e "An error occurred when running ec2-create-snapshot. The error returned is below:\n$ec2_create_snapshot_result" 1>&2 ; exit 70
+    echo -e "An error occurred when running ec2-create-snapshot:\n$ec2_create_snapshot_result" 1>&2 ; exit 70
   fi  
   create_EBS_Snapshot_Tags
 done
 
 #if purge_snapshots is true, then run purge_EBS_Snapshots function
 if $purge_snapshots; then
-  echo "Snapshot Purging is Starting Now."
+  echo "Begin snapshot purging..."
   purge_EBS_Snapshots
+  echo "Finished purging old snapshots."
 fi
