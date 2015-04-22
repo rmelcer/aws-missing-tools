@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # License Type: GNU GENERAL PUBLIC LICENSE, Version 3
-VERSION=1.1.0
+VERSION=1.1.1
 # Authors:
 # Colin Johnson / https://github.com/colinbjohnson / colin@cloudavail.com
 # Ryan Melcer / https://github.com/rmelcer
@@ -12,11 +12,11 @@ VERSION=1.1.0
 ## Dave Stern / https://github.com/davestern
 ## Josef / https://github.com/J0s3f
 ## buckelij / https://github.com/buckelij
-ERROR=0
+ERROR=-1
 
 function finish {
     if (( $ERROR != 0 )); then
-        echo "$0 encountered a problem during execution"
+        echo "$0 encountered a problem during execution: $ERROR"
     fi
 }
 
@@ -291,3 +291,5 @@ if $purge_snapshots; then
     purge_snapshots
     (( $verbose )) && echo "Done."
 fi
+ERROR=0
+exit 0
