@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # License Type: GNU GENERAL PUBLIC LICENSE, Version 3
-VERSION=0.3.1
+VERSION=1.0.0
 # Authors:
 # Colin Johnson / https://github.com/colinbjohnson / colin@cloudavail.com
 # Ryan Melcer / https://github.com/rmelcer
@@ -81,8 +81,14 @@ tag_snapshots() {
     fi
 
     if [[ -n $snapshot_tags ]]; then
-        echo "Tagging Snapshot $ec2_snapshot_resource_id with the following Tags: $snapshot_tags"
-        (( $dry_run )) || aws_ec2_create_tag_result=$(aws ec2 create-tags --resources $ec2_snapshot_resource_id --region $region --tags $snapshot_tags --output text 2>&1)
+        (( $verbose )) && echo "Tagging Snapshot $snapshot_id with the following Tags: $snapshot_tags"
+        (( $verbose )) && echo "CMD: aws ec2 create-tags --resources $snapshot_id --region $region --tags $snapshot_tags --output text 2>&1"
+        (( $dry_run )) || tag_output=$(aws ec2 create-tags --resources $snapshot_id --region $region --tags $snapshot_tags --output text 2>&1)
+        if [[ $? != 0 ]]; then
+            echo -e "An error occurred when running ec2-create-tags:\n$tag_output" 1>&2 ; exit 69
+        elif (( $debug )); then
+            echo -e "Create snapshot results:\n$tag_output"
+        fi  
     elif (( $verbose > 0 )); then
         echo "No snapshot tags selected."
     fi
@@ -260,13 +266,13 @@ get_EBS_List
 
 #the loop below is called once for each volume in $ebs_backup_list - the currently selected EBS volume is passed in as "ebs_selected"
 for ebs_selected in $ebs_backup_list; do
-    ec2_snapshot_description="ec2ab_${ebs_selected}_$current_date"
-    (( $verbose )) && echo "CMD: aws ec2 create-snapshot --region $region --description $ec2_snapshot_description --volume-id $ebs_selected --output text --query SnapshotId 2>&1"
-    (( $dry_run )) || ec2_snapshot_resource_id=$(aws ec2 create-snapshot --region $region --description $ec2_snapshot_description --volume-id $ebs_selected --output text --query SnapshotId 2>&1)
+    snapshot_description="ec2ab_${ebs_selected}_$current_date"
+    (( $verbose )) && echo "CMD: aws ec2 create-snapshot --region $region --description $snapshot_description --volume-id $ebs_selected --output text --query SnapshotId 2>&1"
+    (( $dry_run )) || snapshot_id=$(aws ec2 create-snapshot --region $region --description $snapshot_description --volume-id $ebs_selected --output text --query SnapshotId 2>&1)
     if [[ $? != 0 ]]; then
-        echo -e "An error occurred when running ec2-create-snapshot:\n$ec2_create_snapshot_result" 1>&2 ; exit 70
+        echo -e "An error occurred when running ec2-create-snapshot:\n$snapshot_id" 1>&2 ; exit 70
     elif (( $debug )); then
-        echo -e "Create snapshot results:\n$ec2_snapshot_resource_id"
+        echo -e "Create snapshot results:\n$snapshot_id"
     fi  
     tag_snapshots
 done
