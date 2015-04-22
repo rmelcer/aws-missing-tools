@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # License Type: GNU GENERAL PUBLIC LICENSE, Version 3
-VERSION=1.0.0
+VERSION=1.1.0
 # Authors:
 # Colin Johnson / https://github.com/colinbjohnson / colin@cloudavail.com
 # Ryan Melcer / https://github.com/rmelcer
@@ -12,6 +12,15 @@ VERSION=1.0.0
 ## Dave Stern / https://github.com/davestern
 ## Josef / https://github.com/J0s3f
 ## buckelij / https://github.com/buckelij
+ERROR=0
+
+function finish {
+    if (( $ERROR != 0 )); then
+        echo "$0 encountered a problem during execution"
+    fi
+}
+
+trap finish EXIT
 
 #Default values
 app_name=$(basename $0)
@@ -30,7 +39,7 @@ check_prereqs() {
         #use of "hash" chosen as it is a shell builtin and will add programs to hash table, possibly speeding execution. Use of type also considered - open to suggestions.
         hash $prerequisite &> /dev/null
         if [[ $? == 1 ]]; then #status of 70: executable was not found
-            echo "In order to use $app_name, the executable \"$prerequisite\" must be installed." 1>&2 ; exit 70
+            echo "In order to use $app_name, the executable \"$prerequisite\" must be installed." 1>&2 ; ERROR=70; exit 70
         fi
     done
 }
@@ -40,24 +49,24 @@ get_EBS_List() {
     case $selection_method in
         volumeid)
             if [[ -z $volumeid ]]; then
-                echo "Volume ID is required by default." 1>&2 ; exit 64
+                echo "Volume ID is required by default." 1>&2 ; ERROR=64; exit 64
             fi
             ebs_selection_string="--volume-ids $volumeid"
             ;;
         tag)
             if [[ -z $tag ]]; then
-                echo "Valid tag (-t Backup,Values=true) required." 1>&2 ; exit 64
+                echo "Valid tag (-t Backup,Values=true) required." 1>&2 ; ERROR=64; exit 64
             fi
             ebs_selection_string="--filters Name=tag:$tag"
             ;;
-        *) echo "Invalid selection method." 1>&2 ; exit 64 ;;
+        *) echo "Invalid selection method." 1>&2 ; ERROR=64; exit 64 ;;
     esac
     #create a list of all ebs volumes that match the selection string from above
     (( $verbose )) && echo "CMD: aws ec2 describe-volumes --region $region $ebs_selection_string --output text --query 'Volumes[*].VolumeId'"
     ebs_backup_list=$(aws ec2 describe-volumes --region $region $ebs_selection_string --output text --query 'Volumes[*].VolumeId')
     ebs_backup_list_result=$(echo $?)
     if [[ $ebs_backup_list_result -gt 0 ]]; then
-        echo -e "An error occurred when running ec2-describe-volumes:\n$ebs_backup_list" 1>&2 ; exit 70
+        echo -e "An error occurred when running ec2-describe-volumes:\n$ebs_backup_list" 1>&2 ; ERROR=70; exit 70
     elif (( $debug > 0 )); then
         echo -e "EBS backup list:\n$ebs_backup_list"
     fi
@@ -85,7 +94,7 @@ tag_snapshots() {
         (( $verbose )) && echo "CMD: aws ec2 create-tags --resources $snapshot_id --region $region --tags $snapshot_tags --output text 2>&1"
         (( $dry_run )) || tag_output=$(aws ec2 create-tags --resources $snapshot_id --region $region --tags $snapshot_tags --output text 2>&1)
         if [[ $? != 0 ]]; then
-            echo -e "An error occurred when running ec2-create-tags:\n$tag_output" 1>&2 ; exit 69
+            echo -e "An error occurred when running ec2-create-tags:\n$tag_output" 1>&2 ; ERROR=69; exit 69
         elif (( $debug )); then
             echo -e "Create snapshot results:\n$tag_output"
         fi  
@@ -105,7 +114,7 @@ set_purge_epoch() {
             purge_offset_s=$(( ${purge_offset%?} * 60 )) ;;
         [0-9]*)
             purge_offset_s=$(( $purge_offset * 86400 )) ;;
-        *) echo "Invalid purge time specified" && exit 1 ;;
+        *) echo "Invalid purge time specified" && ERROR=1; exit 1 ;;
     esac
     (( $debug )) && echo "Purge after seconds value: $purge_offset_s"
 
@@ -196,7 +205,7 @@ while getopts :s:c:r:t:k:vpnHuhVdN opt; do
         r)
             region="$OPTARG" ;;
         v)
-            echo "version $VERSION"; exit 0 ;;
+            echo "version $VERSION"; ERROR=0; exit 0 ;;
         t)
             tag="$OPTARG" ;;
         k)
@@ -212,13 +221,13 @@ while getopts :s:c:r:t:k:vpnHuhVdN opt; do
         u)
             user_tags=true ;;
         h)
-            USAGE && exit 0 ;;
+            USAGE && ERROR=0; exit 0 ;;
         V)
             volumeid="$OPTARG" ;;
         \?)
-            echo "Invalid option: -$OPTARG"; exit 1 ;;
+            echo "Invalid option: -$OPTARG"; ERROR=1; exit 1 ;;
         *)
-            USAGE; exit 0 ;;
+            USAGE; ERROR=0; exit 0 ;;
     esac
 done
 
@@ -242,7 +251,7 @@ if [[ -n $cron_primer ]]; then
     if [[ -f $cron_primer ]]; then
         source $cron_primer
     else
-        echo "Cron Primer File \"$cron_primer\" Could Not Be Found." 1>&2 ; exit 70
+        echo "Cron Primer File \"$cron_primer\" Could Not Be Found." 1>&2 ; ERROR=70; exit 70
     fi
 fi
 
@@ -259,7 +268,7 @@ check_prereqs
 #sets the PurgeDate tag to the number of seconds that a snapshot should be retained
 if [[ -n $purge_offset ]]; then
     set_purge_epoch
-    echo "Snapshots will be eligible for purging after $(date -r $purge_epoch)."
+    (( $verbose )) && echo "Snapshots will be eligible for purging after $(date -r $purge_epoch)."
 fi
 
 get_EBS_List
@@ -270,7 +279,7 @@ for ebs_selected in $ebs_backup_list; do
     (( $verbose )) && echo "CMD: aws ec2 create-snapshot --region $region --description $snapshot_description --volume-id $ebs_selected --output text --query SnapshotId 2>&1"
     (( $dry_run )) || snapshot_id=$(aws ec2 create-snapshot --region $region --description $snapshot_description --volume-id $ebs_selected --output text --query SnapshotId 2>&1)
     if [[ $? != 0 ]]; then
-        echo -e "An error occurred when running ec2-create-snapshot:\n$snapshot_id" 1>&2 ; exit 70
+        echo -e "An error occurred when running ec2-create-snapshot:\n$snapshot_id" 1>&2 ; ERROR=70; exit 70
     elif (( $debug )); then
         echo -e "Create snapshot results:\n$snapshot_id"
     fi  
@@ -278,7 +287,7 @@ for ebs_selected in $ebs_backup_list; do
 done
 
 if $purge_snapshots; then
-    echo "Purging old snapshots..."
+    (( $verbose )) && echo "Purging old snapshots..."
     purge_snapshots
-    echo "Done."
+    (( $verbose )) && echo "Done."
 fi
