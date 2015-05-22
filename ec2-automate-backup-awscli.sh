@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # License Type: GNU GENERAL PUBLIC LICENSE, Version 3
-VERSION=1.1.1
+VERSION=1.1.2
 # Authors:
 # Colin Johnson / https://github.com/colinbjohnson / colin@cloudavail.com
 # Ryan Melcer / https://github.com/rmelcer
@@ -147,7 +147,7 @@ purge_snapshots() {
         #if purge_after_date is not set then we have a problem. Need to alert user.
         if [[ -z $delete_epoch ]]; then
             #Alerts user to the fact that a Snapshot was found with PurgeAllow=true but with no PurgeDate date.
-            echo "Snapshot with the Snapshot ID \"$snapshot_id_evaluated\" has the tag \"PurgeAllow=true\" but does not have a \"PurgeDate=xxxxxxxxxx\" key/value pair. $app_name is unable to determine if $snapshot_id_evaluated should be purged." 1>&2
+            echo "Warning: Snapshot $snapshot_id_evaluated has the 'PurgeAllow' tag but has no 'PurgeDate'. Not purging." 1>&2
         else
             # if $delete_epoch is less than $current_date then
             # PurgeDate is earlier than the current date
@@ -158,7 +158,7 @@ purge_snapshots() {
                     echo "Snapshot \"$snapshot_id_evaluated\" with deletion date of $(date -r $delete_epoch) would be deleted."
                 else
                     aws_ec2_delete_snapshot_result=$(aws ec2 delete-snapshot --region $region --snapshot-id $snapshot_id_evaluated --output text 2>&1)
-                    echo "Snapshot \"$snapshot_id_evaluated\" with deletion date of $(date -r $delete_epoch) was deleted."
+                    (( $verbose )) && echo "Snapshot \"$snapshot_id_evaluated\" with deletion date of $(date -r $delete_epoch) was deleted."
                 fi
             else
                 (( $verbose )) && echo "Snapshot \"$snapshot_id_evaluated\" with deletion date of \"$delete_epoch\" will not be deleted."
